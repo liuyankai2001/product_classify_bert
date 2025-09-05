@@ -1,0 +1,11 @@
+.idea/
+test/
+__pycache__/
+
+data/processed/*
+data/raw/*
+
+logs/*
+models/*
+pretrained/*
+!/**/.gitkeep
