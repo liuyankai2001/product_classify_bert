@@ -2,6 +2,7 @@ import sys
 
 from preprocess.dataset import get_dataloader, DatasetType
 from preprocess.process import process_data
+from runner.evaluate import run_evaluate
 from runner.predict import run_predict
 from runner.train import train
 
@@ -14,6 +15,9 @@ if __name__ == '__main__':
     # print(len(test_dataloader))
 
     # train.py
-    # train()
+    train()
     # predict.py
-    run_predict()
+    # run_predict()
+
+    # evaluate.py
+    # run_evaluate()
