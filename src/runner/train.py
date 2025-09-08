@@ -33,25 +33,26 @@ class EarlyStoping:
 
 
 
-def run_one_epoch(model, dataloader, loss_function, device,optimizer=None ,is_train=True):
+def run_one_epoch(model, dataloader, loss_function, device,scaler=None,optimizer=None ,is_train=True):
     if is_train:
         model.train()
     else:
         model.eval()
     total_loss = 0
-
+    # with torch.autocast()
     with torch.set_grad_enabled(is_train):
         for batch in tqdm(dataloader,desc=("训练" if is_train else "验证")):
             input_ids = batch['input_ids'].to(device) # [batch_size, seq_len]
             attention_mask = batch['attention_mask'].to(device) # [batch_size, seq_len]
             label = batch['label'].to(device) # [batch_size]
-
-            # 前向传播
-            outputs = model(input_ids,attention_mask) # [batch_size, num_classes]
-            loss = loss_function(outputs,label)
+            with torch.autocast(device_type=device.type,dtype=torch.float16):
+                # 前向传播
+                outputs = model(input_ids,attention_mask) # [batch_size, num_classes]
+                loss = loss_function(outputs,label)
             if is_train:
-                loss.backward()
-                optimizer.step()
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
                 optimizer.zero_grad()
             total_loss+=loss.item()
     return total_loss/len(dataloader)
@@ -73,12 +74,15 @@ def train():
 
     # 早停策略
     early_stopping = EarlyStoping()
+    # 梯度缩放器
+    scaler = torch.amp.GradScaler(device.type)
 
+    # 检查是否有检查点
 
     for epoch in range(1,config.EPOCHS+1):
         print(f"========== epoch:{epoch}==========")
         # 训练一轮
-        train_avg_loss = run_one_epoch(model, train_dataloader, loss_function, device,optimizer,is_train=True )
+        train_avg_loss = run_one_epoch(model, train_dataloader, loss_function, device,scaler,optimizer,is_train=True )
         # 验证一轮
         valid_avg_loss = run_one_epoch(model, valid_dataloader, loss_function, device, optimizer,is_train=False)
 
@@ -90,5 +94,9 @@ def train():
         if early_stopping.should_stop(valid_avg_loss,model,path=config.MODELS_DIR / 'best.pt'):
             print("早停策略触发，训练提前结束！")
             break
+
+        # 保存训练状态
+
+
 
     writer.close()
