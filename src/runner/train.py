@@ -76,10 +76,20 @@ def train():
     early_stopping = EarlyStoping()
     # 梯度缩放器
     scaler = torch.amp.GradScaler(device.type)
-
+    start_epoch = 1
     # 检查是否有检查点
+    checkpoint_path = config.MODELS_DIR / 'checkpoint.pt'
+    if checkpoint_path.exists():
+        print("存在断点，继续训练")
+        checkpoint = torch.load(checkpoint_path)
+        optimizer.load_state_dict(checkpoint['model'])
+        scaler.load_state_dict(checkpoint['scaler'])
+        early_stopping.best_loss=(checkpoint['best_loss'])
+        start_epoch = checkpoint['epoch']
+    else:
+        print("不存在断点，从头开始训练")
 
-    for epoch in range(1,config.EPOCHS+1):
+    for epoch in range(start_epoch,config.EPOCHS+1):
         print(f"========== epoch:{epoch}==========")
         # 训练一轮
         train_avg_loss = run_one_epoch(model, train_dataloader, loss_function, device,scaler,optimizer,is_train=True )
@@ -96,7 +106,13 @@ def train():
             break
 
         # 保存训练状态
-
+        checkpoint = {'model':model.state_dict(),
+                      'optimizer':optimizer.state_dict(),
+                      'scaler':scaler.state_dict(),
+                      'best_loss':early_stopping.best_loss,
+                      'counter':early_stopping.counter,
+                      'epoch':epoch}
+        torch.save(checkpoint,config.MODELS_DIR / 'checkpoint.pt')
 
 
     writer.close()
